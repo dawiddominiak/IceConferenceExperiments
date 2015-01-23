@@ -1,25 +1,38 @@
-navigator.getUserMedia = (
-	navigator.getUserMedia || 
-	navigator.webkitGetUserMedia ||
-	navigator.mozGetUserMedia ||
-	navigator.mozGetUserMedia
-);
+var lecturerOnline = angular.module('lecturerOnline', []);
 
-if(navigator.getUserMedia) {
-	navigator.getUserMedia(
-		{
-			video: true,
-			audio: true
-		},
-		function(stream) {
-			var video = document.querySelector('video');
-			video.src = window.URL.createObjectURL(stream);
-			video.play();
-		},
-		function(error) {
-			throw new Error(error);
-		}
+lecturerOnline.factory('userMedia', ['$q', function userMediaFactory($q) {
+	navigator.getUserMedia = (
+		navigator.getUserMedia || 
+		navigator.webkitGetUserMedia ||
+		navigator.mozGetUserMedia ||
+		navigator.mozGetUserMedia
 	);
-} else {
-	throw new Error('navigator.getUserMedia not supported in your browser');
-}
+
+	return $q(function(resolve, reject) {
+		if(navigator.getUserMedia) {
+			navigator.getUserMedia(
+				{
+					video: true,
+					audio: true
+				},
+				resolve,
+				reject
+			);
+		} else {
+			reject(new Error('navigator.getUserMedia not supported in your browser'));
+		}
+	});
+}]);
+
+
+
+lecturerOnline.controller('MainPageCtrl', ['$scope', 'userMedia', function($scope, userMedia) {
+	$scope.streamUrl = "";
+	userMedia.then(function(stream) {
+		video = document.querySelector('video');
+		video.src = window.URL.createObjectURL(stream);
+		video.play();
+	}, function(error) {
+		console.error(error);
+	})
+}]);
