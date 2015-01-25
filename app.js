@@ -1,25 +1,22 @@
-var app = require('http').createServer(handler)
-var io = require('socket.io')(app);
-var fs = require('fs');
+//Dependencies
+var express = require('express.io');
+var app = express();
+var path = require('path');
 
-app.listen(8000);
+//Settings
+var port = 7076;
+app.http().io();
+app.use(express.static(path.join(__dirname, 'public')));
 
-function handler (req, res) {
-  fs.readFile(__dirname + '/index.html',
-  function (err, data) {
-    if (err) {
-      res.writeHead(500);
-      return res.end('Error loading index.html');
-    }
+// view engine setup
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'jade');
 
-    res.writeHead(200);
-    res.end(data);
-  });
-}
+var offers = {};
+//Static routes
+require('./routes/index')(app, offers);
 
-io.on('connection', function (socket) {
-  socket.emit('news', { hello: 'world' });
-  socket.on('my other event', function (data) {
-    console.log(data);
-  });
-});
+//IO routes
+require('./routes/io')(app.io, offers);
+
+app.listen(port);
