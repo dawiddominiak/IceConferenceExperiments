@@ -24,25 +24,26 @@ lecturerOnline.factory('userMedia', ['$q', function userMediaFactory($q) {
 	});
 }]);
 
-lecturerOnline.factory('liveConnection', ['$q', function liveConnectionFactory($q) {
-	var socket = io();
-	return {
-		on: function(name) {
-			var deferred = $q.defer();
-			socket.on(name, deferred.resolve);
-			return deferred.promise;
-		},
-		emit: socket.emit,
-		wait: function(name, message) {
-			var deferred = $q.defer();
-			this.emit.apply(this, arguments);
-			this.on(name + 'Response').then(deferred.resolve, deferred.reject);
-			return deferred.promise;
-		}
-	};
-}]);
+// lecturerOnline.factory('liveConnection', ['$q', function liveConnectionFactory($q) {
+// 	// var socket = io();
+// 	// return {
+// 	// 	on: function(name) {
+// 	// 		var deferred = $q.defer();
+// 	// 		socket.on(name, deferred.resolve);
+// 	// 		return deferred.promise;
+// 	// 	},
+// 	// 	emit: socket.emit,
+// 	// 	wait: function(name, message) {
+// 	// 		var deferred = $q.defer();
+// 	// 		this.emit.apply(this, arguments);
+// 	// 		this.on(name + 'Response').then(deferred.resolve, deferred.reject);
+// 	// 		return deferred.promise;
+// 	// 	}
+// 	// };
+// 	return;
+// }]);
 
-lecturerOnline.factory('RTCConnection', ['$q', 'liveConnection', function RTCConnectionFactory($q, liveConnection) {
+lecturerOnline.factory('RTCConnection', ['$q', function RTCConnectionFactory($q) {
 	var PeerConnection = window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
 	var IceCandidate = window.mozRTCIceCandidate || window.RTCIceCandidate;
 	var SessionDescription = window.mozRTCSessionDescription || window.RTCSessionDescription;
@@ -56,30 +57,52 @@ lecturerOnline.factory('RTCConnection', ['$q', 'liveConnection', function RTCCon
 	};
 
 	var peerConnection = new PeerConnection(configuration);
-	var offerPromise = $q(function(resolve, reject) {
-		peerConnection.createOffer(resolve, reject);
-	});
-	var responsePromise = offerPromise.then(function(offer) {
-		peerConnection.setLocalDescription(offer);
-		return liveConnection.wait('offer', JSON.stringify(offer));
-	});
+
+	function addStream(stream) {
+		peerConnection.addStream(stream);
+	}
+
+	function getOfferPromise() {
+		var deferred = $q.defer();
+		peerConnection.createOffer(deferred.resolve, deferred.reject);
+		return deferred.promise.then(function(offer) {
+			peerConnection.setLocalDescription(offer);
+			return offer;
+		});
+	};
+
+	function stunConnect(offer) {
+		liveConnection.emit('calleeOffer:handle', JSON.stringify({
+			'sdp': offer
+		}));
+	}
 
 	var RTC = {
-		peerConnection: peerConnection,
-		responsePromise: responsePromise
+		createAsCallee: function(stream) {
+			addStream(stream);
+			return getOfferPromise().then(function(offer) {
+				console.log('offer', offer);
+				var socket = io.connect('http://localhost:3001');
+				console.log('before emit', socket);
+				socket.on('connect', function() {
+					console.log('connect');
+					socket.emit('callee', JSON.stringify({
+						'sdp': offer
+					}));
+				});
+				// stunConnect(offer);
+			});
+		}
 	};
 
 	return RTC;
 }]);
 
 lecturerOnline.controller('MainPageCtrl', ['$scope', 'userMedia', 'RTCConnection', function($scope, userMedia, RTCConnection) {
-	$scope.streamUrl = "";
-	console.log(RTCConnection.peerConnection);
 	userMedia.then(function(stream) {
 		video = document.querySelector('video');
 		video.src = window.URL.createObjectURL(stream);
 		video.play();
-	}, function(error) {
-		console.error(error);
+		RTCConnection.createAsCallee(stream);
 	});
 }]);
