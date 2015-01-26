@@ -27,10 +27,9 @@ lecturerOnline.factory('userMedia', ['$q', function userMediaFactory($q) {
 }]);
 
 lecturerOnline.service('streamingURL', [function streamingURL() {
-	this.uuid = uuid.v4();
+	this.uuid = 'a';
 	this.buffer = uuid.parse(this.uuid);
-	this.string = this.buffer.map(function(e) {return String.fromCharCode(e);}).join('');
-	console.log(this.uuid);
+	this.string = 'a'; //this.buffer.map(function(e) {return String.fromCharCode(e);}).join('');
 	this.uriComponent = encodeURIComponent(this.string);
 	this.location = document.location;
 }]);
@@ -71,14 +70,14 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'streamingURL', 'RT
 
 	var peerConnection = new RTCAPI.PeerConnection(configuration);
 
-	// peerConnection.onicecandidate = function(evt) {
-	// 	console.log('CalleeIceCandidate', evt);
-	// 	liveConnection.emit('calleeCandidate:add', {
-	// 		candidate: evt.candidate
-	// 	});
-	// };
-
 	var addStream = peerConnection.addStream.bind(peerConnection);
+
+	peerConnection.onicecandidate = function(evt) {
+		liveConnection.emit('callee:newIceCandidate', {
+			candidate: evt.candidate,
+			offerId: streamingURL.string
+		});
+	};
 
 	function setLocalDescription(offer) {
 		var deferred = $q.defer();
@@ -120,7 +119,15 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'streamingURL', 'RT
 		},
 		waitForAnAnswer: waitForAnAnswer,
 		establish: function(answer) {
-			return setRemoteDescription(answer);
+			return setRemoteDescription(answer).then(function() {
+				return liveConnection.wait('callee:getCallerIceCandidates', {
+					offerId: streamingURL.string
+				});
+			}).tap(function(iceCandidates) {
+				iceCandidates.forEach(function(iceCandidate) {
+					peerConnection.addIceCandidate(new RTCAPI.IceCandidate(iceCandidate));
+				});
+			});
 		}
 	};
 
@@ -136,8 +143,18 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', function 
 	    ]
 	};
 
+
 	var peerConnection = new RTCAPI.PeerConnection(configuration);
 	var talkId = decodeURIComponent(location.pathname.slice(1));
+	
+	peerConnection.onicecandidate = function(evt) {
+		console.log(evt.candidate);
+		liveConnection.emit('caller:newIceCandidate', {
+			candidate: evt.candidate,
+			offerId: talkId
+		});
+	};
+
 	var addStreamHandler = function(addstream) {
 		console.log('Default addstream handler', addstream);
 	};
@@ -186,6 +203,14 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', function 
 					answer: answer,
 					talkId: talkId
 				});
+			}).then(function() {
+				return liveConnection.wait('callee:getCallerIceCandidates', {
+					offerId: talkId
+				});
+			}).tap(function(iceCandidates) {
+				iceCandidates.forEach(function(iceCandidate) {
+					peerConnection.addIceCandidate(new RTCAPI.IceCandidate(iceCandidate));
+				});
 			});
 		},
 		setAddStreamHandler: function(handler) {
@@ -201,7 +226,6 @@ lecturerOnline.controller('MainPageCtrl', ['$scope', 'userMedia', 'RTCCallee', '
 		video = document.querySelector('video');
 		video.src = window.URL.createObjectURL(stream);
 		video.play();
-		console.log(stream.getVideoTracks());
 		RTCCallee.call(stream).then(function(response) {
 			$scope.url = streamingURL.location.protocol + '//' + streamingURL.location.host + '/' + streamingURL.uriComponent;
 			return RTCCallee.waitForAnAnswer();
@@ -214,10 +238,9 @@ lecturerOnline.controller('MainPageCtrl', ['$scope', 'userMedia', 'RTCCallee', '
 	});
 }]);
 
-lecturerOnline.controller('CallerCtrl', ['$scope', 'userMedia', 'liveConnection', 'RTCCaller', function($scope, userMedia, liveConnection, RTCCaller) {
+lecturerOnline.controller('CallerCtrl', ['$scope', 'RTCCaller', function($scope, RTCCaller) {
 	
 	RTCCaller.setAddStreamHandler(function(evt) {
-		console.log(evt.stream, evt.stream.getTracks());
 		video = document.querySelector('video');
 		video.src = window.URL.createObjectURL(evt.stream);
 		video.play();

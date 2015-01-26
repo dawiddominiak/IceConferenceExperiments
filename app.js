@@ -13,11 +13,14 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
 var offers = {};
-var answers = {};
+var candidates = {
+  callee: {},
+  caller: {}
+};
 //Static routes
-require('./routes/index')(app, offers, answers);
+require('./routes/index')(app, offers, candidates);
 
 //IO routes
-require('./routes/io')(app.io, offers, answers);
+require('./routes/io')(app.io, offers, candidates);
 
 app.listen(port);
