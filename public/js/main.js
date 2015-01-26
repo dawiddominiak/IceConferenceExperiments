@@ -55,10 +55,12 @@ lecturerOnline.factory('RTCConnection', ['$q', 'liveConnection', 'streamingURL',
 	var IceCandidate = window.mozRTCIceCandidate || window.RTCIceCandidate;
 	var SessionDescription = window.mozRTCSessionDescription || window.RTCSessionDescription;
 
+	var streamHandler;
+
 	var configuration = {
 	    iceServers: [
 	        {
-	        	url: "stun:localhost:3000"
+	        	url: "stun:stun.l.google.com:19302"
 	        }
 	    ]
 	};
@@ -78,7 +80,7 @@ lecturerOnline.factory('RTCConnection', ['$q', 'liveConnection', 'streamingURL',
 		});
 	};
 
-	function stunConnect(offer) {
+	function connect(offer) {
 		return liveConnection.wait('callee:sendOffer', {
 			'sdp': offer,
 			'uri': streamingURL.string
@@ -87,11 +89,36 @@ lecturerOnline.factory('RTCConnection', ['$q', 'liveConnection', 'streamingURL',
 
 	var RTC = {
 		createAsCallee: function(stream) {
+			peerConnection.onicecandidate = function(evt) {
+				console.log('CalleeIceCandidate', evt);
+				liveConnection.emit('calleeCandidate:add', {
+					candidate: evt.candidate
+				});
+			};
+
 			addStream(stream);
 			return getOfferPromise().then(function(offer) {
-				return stunConnect(offer);
+				return connect(offer);
 			});
+		},
+
+		createAsCaller: function(stream) {
+			peerConnection.onicecandidate = function(evt) {
+				console.log('CallerIceCandidate', evt);
+				liveConnection.emit('callerCandidate:add', {
+					candidate: evt.candidate
+				});
+			};
+
+			peerConnection.onaddstream = function(evt) {
+				streamHandler.apply(this, arguments);
+			};
+		},
+
+		setCallerStreamHandler: function(handler) {
+			streamHandler = handler;
 		}
+
 	};
 
 	return RTC;
@@ -106,5 +133,17 @@ lecturerOnline.controller('MainPageCtrl', ['$scope', 'userMedia', 'RTCConnection
 		RTCConnection.createAsCallee(stream).then(function(response) {
 			$scope.url = streamingURL.location.protocol + '//' + streamingURL.location.host + '/' + streamingURL.uriComponent;
 		});
+	});
+}]);
+
+lecturerOnline.controller('CallerCtrl', ['$scope', 'liveConnection', 'RTCConnection', function($scope, liveConnection, RTCConnection) {
+	console.log('CHKPNT 1');
+	RTCConnection.setCallerStreamHandler(function(evt) {
+		video = document.querySelector('video');
+		video.src = window.URL.createObjectURL(evt.stream);
+		video.play();
+	});
+	liveConnection.wait('caller:demandOffer', decodeURIComponent(location.pathname.slice(1))).then(function(offer) {
+		console.log(offer);
 	});
 }]);

@@ -7,15 +7,18 @@ module.exports = function(app, offers) {
 
 	/* GET home page. */
 	app.get('/', function(req, res, next) {
-	  res.render('index', {
-	  	title: 'Lecturer online'
-	  });
+		res.render('index', {
+			title: 'Lecturer online',
+			controller: 'MainPageCtrl'
+		});
 	});
 
 	/* GET offers. */
 
 	app.get('/:offer', function(req, res, next) {
-		var offer = req.params.offer;
-		res.send(JSON.stringify(offers[offer]));
+		res.render('caller', {
+			title: 'Lecturer online',
+			controller: 'CallerCtrl'
+		});
 	});
 };
