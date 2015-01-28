@@ -221,7 +221,17 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', function 
 	return RTCCaller;
 }]);
 
-lecturerOnline.controller('MainPageCtrl', ['$scope', 'userMedia', 'RTCCallee', 'streamingURL', function($scope, userMedia, RTCCallee, streamingURL) {
+lecturerOnline.controller('MainPageCtrl', ['$scope', 'liveConnection', function($scope, liveConnection) {
+	console.log('here I am');
+	liveConnection.wait('callee:createConference', {
+		calleeName: "Dawid Dominiak",
+		conferenceName: "Conference with explosions"
+	}).tap(function(result) {
+		console.log(result);
+	}).done();
+}]);
+
+lecturerOnline.controller('CalleeCtrl', ['$scope', 'userMedia', 'RTCCallee', 'streamingURL', function($scope, userMedia, RTCCallee, streamingURL) {
 	userMedia.then(function(stream) {
 		video = document.querySelector('video');
 		video.src = window.URL.createObjectURL(stream);

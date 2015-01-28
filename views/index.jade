@@ -2,11 +2,18 @@ extends layout
 
 block content
   h1= title
-  video
-  a(ng-href="{{url}}")= "{{ url }}"
+  form(ng-submit="submit()")
+    div(class="ui left icon input")
+      input(type="text" ng-model="conferenceName" placeholder="Conference name ...")
+      i(class="users icon")
+    div(class="ui left icon input")
+      input(type="text" ng-model="calleeName" placeholder="Your name ...")
+      i(class="user icon")
+    div(type="submit" value="Create new conference" class="ui icon button")
+      i(class="cloud icon" ng-click="submit()")
   script(type='text/javascript', src='/js/bower_components/angular/angular.js')
   script(type='text/javascript', src='/js/bower_components/angular-extend-promises/angular-extend-promises.js')
   script(type='text/javascript', src='/js/bower_components/node-uuid/uuid.js')
-  script(type='text/javascript', src='//cdn.jsdelivr.net/semantic-ui/1.7.1/javascript/semantic.min.js')
+  script(type='text/javascript', src='/js/bower_components/semantic-ui/dist/semantic.min.js')
   script(type='text/javascript', src='/socket.io/socket.io.js')
   script(type='text/javascript', src='/js/main.js')

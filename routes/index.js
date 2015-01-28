@@ -5,20 +5,21 @@ module.exports = function(app, offers) {
 	// 	if(offers)
 	// });
 
-	/* GET home page. */
-	app.get('/', function(req, res, next) {
-		res.render('index', {
-			title: 'Lecturer online',
-			controller: 'MainPageCtrl'
-		});
-	});
 
 	/* GET offers. */
 
-	app.get('/:offer', function(req, res, next) {
+	app.get('/conf/:url', function(req, res, next) {
 		res.render('caller', {
-			title: 'Lecturer online',
+			title: 'Ice Conference',
 			controller: 'CallerCtrl'
+		});
+	});
+
+	/* GET home page. */
+	app.get('/*', function(req, res, next) {
+		res.render('index', {
+			title: 'Ice Conference',
+			controller: 'MainPageCtrl'
 		});
 	});
 };

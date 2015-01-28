@@ -12,15 +12,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
-var offers = {};
-var candidates = {
-  callee: {},
-  caller: {}
-};
+var conferences = {};
 //Static routes
-require('./routes/index')(app, offers, candidates);
+require('./routes/index')(app, conferences);
 
 //IO routes
-require('./routes/io')(app.io, offers, candidates);
+require('./routes/io')(app.io, conferences);
 
 app.listen(port);
