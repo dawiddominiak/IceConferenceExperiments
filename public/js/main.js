@@ -119,9 +119,11 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function 
 
 		peerConnection.onicecandidate = function(evt) {
 		console.log('onicecandidate', evt);
-			if(evt.candidate) {
+			if(evt.candidate !== null) {
 				localIceCandidates.push(evt.candidate);
 				iceCandidatesDeferred.resolve(localIceCandidates);
+			} else {
+				iceCandidatesDeferred.resolve(null);
 			}
 			peerConnection.onicecandidate = null;
 		};
@@ -149,7 +151,7 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function 
 		if(!remoteIceCandidatesPromises[p2pId]) {
 			remoteIceCandidatesPromises[p2pId] = remoteIceCandidatesDeferred[p2pId].promise;
 		}
-		remoteIceCandidatesDeferred[p2pId].resolve(new RTCAPI.IceCandidate(ev.candidates[0]));
+		remoteIceCandidatesDeferred[p2pId].resolve(ev.candidates ? new RTCAPI.IceCandidate(ev.candidates[0]) : ev.candidates);
 	});
 
 	function setLocalDescription(peerConnection, offer) {
@@ -209,7 +211,9 @@ var RTCCallee = {
 		}).tap(function() {
 			return remoteIceCandidatesPromises[p2p.id].tap(function(remoteIceCandidate) {
 				console.log('remoteIceCandidate', remoteIceCandidate);
-				localPeerConnection.addIceCandidate(remoteIceCandidate);
+				if(remoteIceCandidate !== null) {
+					localPeerConnection.addIceCandidate(remoteIceCandidate);
+				}
 			});
 		});
 	},
@@ -244,14 +248,19 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', 'conferen
 		if(evt.candidate) {
 			localIceCandidates.push(evt.candidate);
 			iceCandidatesDeferred.resolve(localIceCandidates);
+		} else {
+			iceCandidatesDeferred.resolve(null);
 		}
 		peerConnection.onicecandidate = null;
 	};
 
 	liveConnection.on('CalleeIceCandidatesEmitted', function(ev) {
-		ev.candidates.forEach(function(candidate) {
-			peerConnection.addIceCandidate(new RTCAPI.IceCandidate(candidate));
-		});
+		if(ev.candidates) {
+			peerConnection.addIceCandidate(new RTCAPI.IceCandidate(ev.candidates[0]));
+		}
+		// ev.candidates.forEach(function(candidate) {
+			
+		// });
 	});
 
 	var streamHandler = function(stream) {
