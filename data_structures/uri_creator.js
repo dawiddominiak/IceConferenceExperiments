@@ -2,7 +2,6 @@ module.exports = {
 	_current: [],
 	addNew: function(name) {
 		var camelsifiedUniqueName = this._nameGenerator(name);
-		console.log(this._current);
 		this._current.push(camelsifiedUniqueName);
 		return camelsifiedUniqueName;
 	},

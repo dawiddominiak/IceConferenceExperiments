@@ -30,7 +30,7 @@ lecturerOnline.config(['$routeProvider', '$locationProvider', function($routePro
 
 lecturerOnline.factory('userMedia', ['$q', function userMediaFactory($q) {
 	navigator.getUserMedia = (
-		navigator.getUserMedia || 
+		navigator.getUserMedia ||
 		navigator.webkitGetUserMedia ||
 		navigator.mozGetUserMedia ||
 		navigator.mozGetUserMedia
@@ -54,8 +54,8 @@ lecturerOnline.factory('userMedia', ['$q', function userMediaFactory($q) {
 
 lecturerOnline.service('RTCAPI', [function RTCAPI() {
 	this.PeerConnection = window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
-	this.IceCandidate = window.mozRTCIceCandidate || window.RTCIceCandidate;
-	this.SessionDescription = window.mozRTCSessionDescription || window.RTCSessionDescription;
+	this.IceCandidate = window.RTCIceCandidate || window.mozRTCIceCandidate || window.webkitRTCIceCandidate;
+	this.SessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
 }]);
 
 lecturerOnline.factory('liveConnection', ['$q', function liveConnectionFactory($q) {
@@ -80,29 +80,37 @@ lecturerOnline.factory('liveConnection', ['$q', function liveConnectionFactory($
 
 lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function RTCConnectionFactory($q, liveConnection, RTCAPI) {
 	var configuration = {
-	    iceServers: [
-	        {
-	        	url: "stun:stun.l.google.com:19302"
-	        }
-	    ]
+		iceServers: [
+			{
+				url: "stun:stun.l.google.com:19302"
+			}
+		]
 	};
 
 	var connections = {};
 	var streamHandlers = {};
-	var iceCandidatesPromises = {};
+	var localIceCandidatesPromises = {};
+	var remoteIceCandidatesDeferred = {};
+	var remoteIceCandidatesPromises = {};
 
 	//TODO: in the future
 	var askForAcceptation = function(p2p) {
 		var deferred = $q.defer();
 		deferred.resolve(true);
 		return deferred.promise;
-	}
+	};
 
 	var newPeerConnection = function(p2p) {
 		var iceCandidatesDeferred = $q.defer();
 		var localIceCandidates = [];
-		var iceCandidatesPromise = iceCandidatesDeferred.promise;
-		iceCandidatesPromises[p2p.id] = iceCandidatesPromise;
+		var localIceCandidatesPromise = iceCandidatesDeferred.promise;
+		if(!remoteIceCandidatesDeferred[p2p.id]) {
+			remoteIceCandidatesDeferred[p2p.id] = $q.defer();
+		}
+		if(!remoteIceCandidatesPromises[p2p.id]) {
+			remoteIceCandidatesPromises[p2p.id] = remoteIceCandidatesDeferred[p2p.id].promise;
+		}
+		localIceCandidatesPromises[p2p.id] = localIceCandidatesPromise;
 		var peerConnection = new RTCAPI.PeerConnection(configuration);
 		connections[p2p.id] = {
 			peerConnection: peerConnection,
@@ -110,11 +118,12 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function 
 		};
 
 		peerConnection.onicecandidate = function(evt) {
-			if(evt.candidate !== null) {
+		console.log('onicecandidate', evt);
+			if(evt.candidate) {
 				localIceCandidates.push(evt.candidate);
-			} else {
 				iceCandidatesDeferred.resolve(localIceCandidates);
 			}
+			peerConnection.onicecandidate = null;
 		};
 
 		peerConnection.onaddstream = function(stream) {
@@ -128,14 +137,19 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function 
 		};
 
 		return peerConnection;
-	}
+	};
 
 	liveConnection.on('CallerIceCandidatesEmitted', function(ev) {
 		var p2pId = ev.p2pId;
 		var connection = connections[p2pId];
-		ev.candidates.forEach(function(candidate) {
-			connection.peerConnection.addIceCandidate(new RTCAPI.IceCandidate(candidate));
-		});
+		// connection.peerConnection.addIceCandidate
+		if(!remoteIceCandidatesDeferred[p2pId]) {
+			remoteIceCandidatesDeferred[p2pId] = $q.defer();
+		}
+		if(!remoteIceCandidatesPromises[p2pId]) {
+			remoteIceCandidatesPromises[p2pId] = remoteIceCandidatesDeferred[p2pId].promise;
+		}
+		remoteIceCandidatesDeferred[p2pId].resolve(new RTCAPI.IceCandidate(ev.candidates[0]));
 	});
 
 	function setLocalDescription(peerConnection, offer) {
@@ -147,8 +161,8 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function 
 	function setRemoteDescription(peerConnection, offer) {
 		var deferred = $q.defer();
 		peerConnection.setRemoteDescription(new RTCAPI.SessionDescription(offer), deferred.resolve, deferred.reject);
-		return deferred.promise;		
-	}	
+		return deferred.promise;
+	}
 
 	function createAnswer(peerConnection) {
 		var deferred = $q.defer();
@@ -169,17 +183,22 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function 
 
 var RTCCallee = {
 	joinNewCaller: function(p2p, stream) {
+		var localPeerConnection;
 		return askForAcceptation(p2p).then(function() {
 			return newPeerConnection(p2p);
 		}).tap(function(peerConnection) {
+			localPeerConnection = peerConnection;
 			peerConnection.addStream(stream);
+		}).tap(function(peerConnection) {
 			return setRemoteDescription(peerConnection, p2p.offer);
 		}).then(function(peerConnection) {
 			return createAnswer(peerConnection).tap(function(answer) {
 				return setLocalDescription(peerConnection, answer);
 			});
 		}).tap(function() {
-			return iceCandidatesPromises[p2p.id].then(function(candidates) {
+			console.log('CHKPNT 0', localIceCandidatesPromises[p2p.id]);
+			return localIceCandidatesPromises[p2p.id].then(function(candidates) {
+				console.log('CHKPNT 1', candidates);
 				liveConnection.emit('p2p:newCalleeIceCandidates', {
 					candidates: candidates,
 					p2pId: p2p.id
@@ -187,6 +206,11 @@ var RTCCallee = {
 			});
 		}).then(function(answer) {
 			return sendAnswerToCaller(p2p.id, answer);
+		}).tap(function() {
+			return remoteIceCandidatesPromises[p2p.id].tap(function(remoteIceCandidate) {
+				console.log('remoteIceCandidate', remoteIceCandidate);
+				localPeerConnection.addIceCandidate(remoteIceCandidate);
+			});
 		});
 	},
 	setStreamHandler: function(p2pId, handler) {
@@ -216,11 +240,12 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', 'conferen
 	var addStream = peerConnection.addStream.bind(peerConnection);
 
 	peerConnection.onicecandidate = function(evt) {
-		if(evt.candidate !== null) {
+		console.log('onicecandidate', evt);
+		if(evt.candidate) {
 			localIceCandidates.push(evt.candidate);
-		} else {
 			iceCandidatesDeferred.resolve(localIceCandidates);
 		}
+		peerConnection.onicecandidate = null;
 	};
 
 	liveConnection.on('CalleeIceCandidatesEmitted', function(ev) {
@@ -278,7 +303,9 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', 'conferen
 					offer: offer
 				});
 			}).tap(function(p2p) {
+					console.log('CHKPNT 0', iceCandidatesPromise);
 				return iceCandidatesPromise.then(function(candidates) {
+					console.log('CHKPNT 1', candidates);
 					liveConnection.emit('p2p:newCallerIceCandidates', {
 						candidates: candidates,
 						p2pId: p2p.id
@@ -339,6 +366,7 @@ lecturerOnline.controller('CalleeCtrl', ['$scope', '$q', '$location', 'userMedia
 		$scope.conference = conference.conferenceInfo;
 	}).done();
 	liveConnection.on('P2PConnectionRequested', function(p2p) {
+		console.log('p2p connection requested', p2p);
 		$scope.streamPromise.then(function(stream) {
 			return RTCCallee.joinNewCaller(p2p, stream);
 		}).done();
@@ -350,7 +378,6 @@ lecturerOnline.directive('camera', function() {
 		templateUrl: '/js/player/view.html',
 		link: function(scope, element, attr) {
 			scope.streamPromise.tap(function(stream) {
-				console.log(stream);
 				var video = element.find('video.camera');
 				video.width('100%'); //TODO move to CSS
 				var videoUrl = window.URL.createObjectURL(stream);
@@ -372,19 +399,17 @@ lecturerOnline.controller('CallerCtrl', ['$scope', '$q', '$routeParams', 'confer
 		$scope.localStreamPromise,
 		conference.get($routeParams.confUri)
 	]).spread(function(stream, conference) {
-		$scope.conference = conference.conferenceInfo;
+		$scope.conference = conference;
 		return RTCCaller.prepareP2POffer(stream);
 	}).then(function (p2p) {
 		$scope.p2p = p2p;
 	}).done();
 
-	RTCCaller
 	liveConnection.on('P2PAnswerCame', function(p2p) {
 		$scope.p2p = p2p;
 		RTCCaller.establish(p2p.answer).done();
 	});
-	RTCCaller.setStreamHandler(function(remoteStream) {
-		console.log(remoteStream);
-		$scope.remoteStreamDeffered.resolve(remoteStream.stream);
+	RTCCaller.setStreamHandler(function(remoteStreamEvent) {
+		$scope.remoteStreamDeffered.resolve(remoteStreamEvent.stream);
 	});
 }]);
