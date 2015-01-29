@@ -1,0 +1,33 @@
+<div class="ui stackable center aligned page grid">
+	<div class="one column row">
+		<div class="column">
+			<h1>IceConference</h1>
+		</div>
+	</div>
+</div>
+<div class="ui stackable center aligned page grid">
+	<div class="ui grid two column row sixteen wide">
+		<div class="eight wide column">
+			<div camera stream-promise="streamPromise"></div>
+		</div>
+		<div class="eight wide column ui divided very relaxed list">
+			<div class="item">
+				<i class="star icon"></i>
+				<div class="content">
+					<div class="header">
+						{{conference.name}}
+					</div>
+						{{conference.id}}
+				</div>
+			</div>
+			<div class="item">
+				<i class="record icon"></i>
+					<div class="content">
+						<a class="header" ng-href="{{location + conference.uri}}">
+							{{location + conference.uri}}
+						</a>
+					</div>
+			</div>
+		</div>
+	</div>
+</div>

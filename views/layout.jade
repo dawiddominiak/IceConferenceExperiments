@@ -3,5 +3,13 @@ html(ng-app="lecturerOnline")
 	head
 		title= title
 		link(rel='stylesheet', href='/js/bower_components/semantic-ui/dist/semantic.min.css')
-	body(ng-controller=controller)
+		script(type='text/javascript', src='/js/bower_components/jquery/dist/jquery.min.js')
+		script(type='text/javascript', src='/js/bower_components/angular/angular.js')
+		script(type='text/javascript', src='/js/bower_components/angular-route/angular-route.min.js')
+		script(type='text/javascript', src='/js/bower_components/angular-extend-promises/angular-extend-promises.js')
+		script(type='text/javascript', src='/js/bower_components/node-uuid/uuid.js')
+		script(type='text/javascript', src='/js/bower_components/semantic-ui/dist/semantic.min.js')
+		script(type='text/javascript', src='/socket.io/socket.io.js')
+		script(type='text/javascript', src='/js/main.js')
+	body
 		block content

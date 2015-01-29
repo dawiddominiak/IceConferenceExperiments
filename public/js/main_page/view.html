@@ -1,0 +1,29 @@
+<div class="ui stackable center aligned page grid">
+	<div class="one column row">
+		<div class="column">
+			<h1>IceConference</h1>
+		</div>
+	</div>
+</div>
+<form ng-submit="submit()">
+	<div class="ui one column stackable center aligned page grid">
+		<div class="column eight wide segment ui compact page grid">
+			<div class="one column row">
+				<div class="ui input column">
+					<input type="text" ng-model="conferenceName" placeholder="Conference name ...">
+				</div>
+			</div>
+			<div class="one column row">
+				<div class="ui input column">
+					<input type="text" ng-model="calleeName" placeholder="Your name ...">
+				</div>
+			</div>
+			<div class="one column row">
+				<div type="submit" value="Create new conference" class="ui labeled icon button column" ng-click="submit()">
+					<i class="video camera icon"></i>
+					Create
+				</div>
+			</div>
+		</div>
+	</div>
+</form>
