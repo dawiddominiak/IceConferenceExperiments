@@ -338,17 +338,6 @@ lecturerOnline.controller('CalleeCtrl', ['$scope', '$q', '$location', 'userMedia
 	var creationFinishedPromise = conference.create().tap(function() {
 		$scope.conference = conference.conferenceInfo;
 	}).done();
-	// $scope.streamPromise.tap(function(stream) {
-		// RTCCallee.call(stream).then(function(response) {
-		// 	$scope.url = streamingURL.location.protocol + '//' + streamingURL.location.host + '/' + streamingURL.uriComponent;
-		// 	return RTCCallee.waitForAnAnswer();
-		// }).tap(function(answer) {
-		// 	console.log('answer', answer);
-		// 	return RTCCallee.establish(answer);
-		// }).tap(function() {
-		// 	console.log('connected');
-		// }).done();
-	// }).done();
 	liveConnection.on('P2PConnectionRequested', function(p2p) {
 		$scope.streamPromise.then(function(stream) {
 			return RTCCallee.joinNewCaller(p2p, stream);
@@ -361,6 +350,7 @@ lecturerOnline.directive('camera', function() {
 		templateUrl: '/js/player/view.html',
 		link: function(scope, element, attr) {
 			scope.streamPromise.tap(function(stream) {
+				console.log(stream);
 				var video = element.find('video.camera');
 				video.width('100%'); //TODO move to CSS
 				var videoUrl = window.URL.createObjectURL(stream);
@@ -375,9 +365,11 @@ lecturerOnline.directive('camera', function() {
 });
 
 lecturerOnline.controller('CallerCtrl', ['$scope', '$q', '$routeParams', 'conference', 'RTCCaller', 'userMedia', 'liveConnection', function($scope, $q, $routeParams, conference , RTCCaller, userMedia, liveConnection) {
-	$scope.streamPromise = userMedia;
+	$scope.localStreamPromise = userMedia;
+	$scope.remoteStreamDeffered = $q.defer();
+	$scope.remoteStreamPromise = $scope.remoteStreamDeffered.promise;
 	$q.all([
-		$scope.streamPromise,
+		$scope.localStreamPromise,
 		conference.get($routeParams.confUri)
 	]).spread(function(stream, conference) {
 		$scope.conference = conference.conferenceInfo;
@@ -386,16 +378,13 @@ lecturerOnline.controller('CallerCtrl', ['$scope', '$q', '$routeParams', 'confer
 		$scope.p2p = p2p;
 	}).done();
 
+	RTCCaller
 	liveConnection.on('P2PAnswerCame', function(p2p) {
 		$scope.p2p = p2p;
 		RTCCaller.establish(p2p.answer).done();
 	});
-// 	RTCCaller.setAddStreamHandler(function(evt) {
-// 		video = document.querySelector('video');
-// 		video.src = window.URL.createObjectURL(evt.stream);
-// 		video.play();
-// 	});
-// 	RTCCaller.answer().then(function(answer) {
-// 		// console.log('answer', answer);
-// 	}).done();
+	RTCCaller.setStreamHandler(function(remoteStream) {
+		console.log(remoteStream);
+		$scope.remoteStreamDeffered.resolve(remoteStream.stream);
+	});
 }]);
