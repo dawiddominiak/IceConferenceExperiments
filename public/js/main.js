@@ -90,6 +90,7 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function 
 	var connections = {};
 	var streamHandlers = {};
 	var iceCandidatesPromises = {};
+	var remoteIceCandidatesDeffered = {};
 
 	//TODO: in the future
 	var askForAcceptation = function(p2p) {
@@ -132,10 +133,13 @@ lecturerOnline.factory('RTCCallee', ['$q', 'liveConnection', 'RTCAPI', function 
 
 	liveConnection.on('CallerIceCandidatesEmitted', function(ev) {
 		var p2pId = ev.p2pId;
-		var connection = connections[p2pId];
-		ev.candidates.forEach(function(candidate) {
-			connection.peerConnection.addIceCandidate(new RTCAPI.IceCandidate(candidate));
-		});
+		remoteIceCandidatesDeffered[p2pId] = $q.defer();
+		remoteIceCandidatesDeffered[p2pId].resolve(ev.candidates);
+		// var connection = connections[p2pId];
+		// ev.candidates.forEach(function(candidate) {
+		// 	connection.peerConnection.addIceCandidate(new RTCAPI.IceCandidate(candidate), console.log.bind(console), console.log.bind(console));
+		// });
+
 	});
 
 	function setLocalDescription(peerConnection, offer) {
@@ -187,6 +191,13 @@ var RTCCallee = {
 			});
 		}).then(function(answer) {
 			return sendAnswerToCaller(p2p.id, answer);
+		}).tap(function() {
+			var connection = connections[p2p.id];
+			return remoteIceCandidatesDeffered[p2p.id].promise.tap(function(candidates) {
+				candidates.forEach(function(candidate) {
+					connection.peerConnection.addIceCandidate(new RTCAPI.IceCandidate(candidate), console.log.bind(console), console.log.bind(console));
+				});
+			});
 		});
 	},
 	setStreamHandler: function(p2pId, handler) {
@@ -209,6 +220,7 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', 'conferen
 	var p2pServer;
 	var iceCandidatesDeferred = $q.defer();
 	var localIceCandidates = [];
+	var remoteIceCandidateDeffered = $q.defer();
 	iceCandidatesPromise = iceCandidatesDeferred.promise;
 
 	var peerConnection = new RTCAPI.PeerConnection(configuration);
@@ -225,7 +237,7 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', 'conferen
 
 	liveConnection.on('CalleeIceCandidatesEmitted', function(ev) {
 		ev.candidates.forEach(function(candidate) {
-			peerConnection.addIceCandidate(new RTCAPI.IceCandidate(candidate));
+			remoteIceCandidateDeffered.resolve(candidate);
 		});
 	});
 
@@ -270,12 +282,12 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', 'conferen
 	var RTCCaller = {
 		prepareP2POffer: function(stream) {
 			peerConnection.addStream(stream);
-			return getOffer().tap(function(offer) {
-				return setLocalDescription(offer);
-			}).then(function(offer) {
+			return getOffer().then(function(offer) {
 				return demandP2PConnection({
 					conferenceUri: conference.conferenceInfo.uri,
 					offer: offer
+				}).tap(function() {
+					return setLocalDescription(offer);
 				});
 			}).tap(function(p2p) {
 				return iceCandidatesPromise.then(function(candidates) {
@@ -287,7 +299,14 @@ lecturerOnline.factory('RTCCaller', ['$q', 'liveConnection', 'RTCAPI', 'conferen
 			});
 		},
 		establish: function(answer) {
-			return setRemoteDescription(answer);
+			return setRemoteDescription(answer).tap(function() {
+				return remoteIceCandidateDeffered.promise.then(function(iceCandidate) {
+					var deferred = $q.defer();
+					console.log(iceCandidate);
+					peerConnection.addIceCandidate(new RTCAPI.IceCandidate(iceCandidate), deferred.resolve, console.log.bind(console));
+					return deferred.promise;
+				}).tap(console.log.bind(console));
+			});
 		},
 		setStreamHandler: function(handler) {
 			streamHandler = handler;
